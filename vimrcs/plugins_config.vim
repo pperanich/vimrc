@@ -118,26 +118,170 @@ au FileType mako vmap Si S"i${ _(<esc>2f"a) }<esc>
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " => lightline
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 let g:lightline = {
-      \ 'colorscheme': 'wombat',
-      \ 'active': {
-      \   'left': [ ['mode', 'paste'],
-      \             ['fugitive', 'readonly', 'filename', 'modified'] ],
-      \   'right': [ [ 'lineinfo' ], ['percent'] ]
-      \ },
-      \ 'component': {
-      \   'readonly': '%{&filetype=="help"?"":&readonly?"🔒":""}',
-      \   'modified': '%{&filetype=="help"?"":&modified?"+":&modifiable?"":"-"}',
-      \   'fugitive': '%{exists("*FugitiveHead")?FugitiveHead():""}'
-      \ },
-      \ 'component_visible_condition': {
-      \   'readonly': '(&filetype!="help"&& &readonly)',
-      \   'modified': '(&filetype!="help"&&(&modified||!&modifiable))',
-      \   'fugitive': '(exists("*FugitiveHead") && ""!=FugitiveHead())'
-      \ },
-      \ 'separator': { 'left': ' ', 'right': ' ' },
-      \ 'subseparator': { 'left': ' ', 'right': ' ' }
-      \ }
+			\ 'colorscheme': 'dracula',
+			\ 'active': {
+            \   'left': [
+            \     ['mode', 'paste'],
+            \     ['filename', 'readonly', 'eol', 'modified']],
+            \   'right': [
+			\     ['syntastic', 'lineinfo'],
+            \     ['percent'],
+            \     ['fugitive', 'filetype', 'fileencoding', 'fileformat']] },
+            \ 'tabline': { 'left': [['tabs']], 'right': [[]] },
+            \ 'tab': {
+            \   'active': ['tabname', 'tabmodified'],
+            \   'inactive': ['tabname', 'tabmodified'],
+            \ },
+            \ 'component': {
+            \   'filename': '%<%{LightLineFilename()}',
+			\ },
+            \ 'component_function': {},
+            \ 'tab_component_function': {},
+            \ 'component_expand': {
+            \   'readonly': 'LightLineReadonly',
+            \   'eol': 'LightLineEol',
+            \   'fugitive': 'LightLineFugitiveStatusline',
+            \ },
+            \ 'component_type': {
+            \   'readonly': 'warning',
+            \   'eol': 'warning',
+            \ },
+			\ 'separator': { 'left': '', 'right': '' },
+			\ 'subseparator': { 'left': '', 'right': '' },
+			\ }
+
+for s:k in ['mode', 'modified', 'filetype', 'fileencoding',
+			\ 'fileformat', 'percent', 'lineinfo']
+	let g:lightline.component_function[s:k] =
+				\ 'LightLine' . toupper(s:k[0]) . s:k[1:]
+endfor
+for s:k in ['name', 'modified']
+	let g:lightline.tab_component_function['tab' . s:k] =
+				\ 'LightLineTab' . toupper(s:k[0]) . s:k[1:]
+endfor
+
+function! LightLineWide(component)
+	let component_visible_width = {
+				\ 'mode': 70,
+				\ 'fileencoding': 70,
+				\ 'fileformat': 70,
+				\ 'filetype': 70,
+				\ 'percent': 50 }
+	return winwidth(0) >= get(component_visible_width, a:component, 0)
+endfunction
+
+function! LightLineVisible(component)
+	let fname = expand('%:t')
+	return fname !=# '__Tag_List__' &&
+				\ fname !=# 'ControlP' &&
+				\ fname !~# 'NERD_tree' &&
+				\ LightLineWide(a:component)
+endfunction
+
+function! LightLineMode()
+	let short_mode_map = {
+				\ 'n': 'N',
+				\ 'i': 'I',
+				\ 'R': 'R',
+				\ 'v': 'V',
+				\ 'V': 'V',
+				\ 'c': 'C',
+				\ "\<C-v>": 'V',
+				\ 's': 'S',
+				\ 'S': 'S',
+				\ "\<C-s>": 'S',
+				\ 't': 'T',
+				\ '?': ' ' }
+	let fname = expand('%:t')
+	return fname ==# '__Tag_List__' ? 'TagList' :
+				\ fname ==# 'ControlP' ? 'CtrlP' :
+				\ fname =~# 'NERD_tree' ? '' :
+				\ LightLineWide('mode') ? lightline#mode() :
+				\ get(short_mode_map, mode(), short_mode_map['?'])
+endfunction
+
+function! LightLineFilename()
+	let fname = expand('%:t')
+	let fpath = expand('%')
+	return &filetype ==# 'dirvish' ?
+				\   (fpath ==# getcwd() . '/' ? fnamemodify(fpath, ':~') :
+				\   fnamemodify(fpath, ':~:.')) :
+				\ &buftype ==# 'terminal' ? fpath :
+				\ &filetype ==# 'fzf' ? 'fzf' :
+				\ &filetype ==# 'vim-plug' ? fpath :
+				\ fname ==# '__Tag_List__' ? '' :
+				\ fname ==# 'ControlP' ? '' :
+				\ fname =~# 'NERD_tree' ?
+				\   (index(['" Press ? for help', '.. (up a dir)'], getline('.')) < 0 ?
+				\     matchstr(getline('.'), '[0-9A-Za-z_/].*') : '') :
+				\ '' !=# fname ? fnamemodify(fpath, ':~:.') : '[No Name]'
+endfunction
+
+function! LightLineReadonly()
+	return &readonly ? 'RO' : ''
+endfunction
+
+function! LightLineEol()
+	return &endofline ? '' : 'NOEOL'
+endfunction
+
+function! LightLineModified()
+	return &modified ? '+' : ''
+endfunction
+
+function! LightLineFiletype()
+	return LightLineVisible('filetype') ?
+				\ (strlen(&filetype) ? &filetype : 'no ft') : ''
+endfunction
+
+function! LightLineFileencoding()
+	return LightLineVisible('fileencoding') ?
+				\ (strlen(&fileencoding) ? &fileencoding : &encoding) : ''
+endfunction
+
+function! LightLineFileformat()
+	return LightLineVisible('fileformat') ? &fileformat : ''
+endfunction
+
+function! LightLinePercent()
+	return LightLineVisible('percent') ? (100 * line('.') / line('$')) . '%' : ''
+endfunction
+
+function! LightLineLineinfo()
+	return LightLineVisible('lineinfo') ?
+				\ printf('%3d:%-2d', line('.'), col('.')) : ''
+endfunction
+
+function! LightLineTabName(n)
+	let bufnr = tabpagebuflist(a:n)[tabpagewinnr(a:n) - 1]
+	let fname = expand('#' . bufnr . ':t')
+	return fname =~# '__Tagbar__' ? 'Tagbar' :
+				\ fname =~# 'NERD_tree' ? 'NERDTree' : 
+				\ ('' != fname ? fname : '[No Name]')
+endfunction
+
+function! LightLineTabModified(n)
+	let winnr = tabpagewinnr(a:n)
+	return gettabwinvar(a:n, winnr, '&modified') ? '⚡' : ''
+endfunction
+
+function! LightLineFugitiveStatusline()
+	if @% !~# '^fugitive:'
+		return ''
+	endif
+	let head = FugitiveHead()
+	if !len(head)
+		return ''
+	endif
+	let commit = matchstr(FugitiveParse()[0], '^\x\+')
+	if len(commit)
+		return head . ':' . commit[0:6]
+	else
+		return head
+	endif
+endfunction
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " => Vimroom
@@ -152,10 +296,10 @@ nnoremap <silent> <leader>z :Goyo<cr>
 " => Ale (syntax checker and linter)
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 let g:ale_linters = {
-\   'javascript': ['eslint'],
-\   'python': ['flake8'],
-\   'go': ['go', 'golint', 'errcheck']
-\}
+			\   'javascript': ['eslint'],
+			\   'python': ['flake8'],
+			\   'go': ['go', 'golint', 'errcheck']
+			\}
 
 nmap <silent> <leader>a <Plug>(ale_next_wrap)
 
@@ -178,11 +322,3 @@ nnoremap <silent> <leader>d :GitGutterToggle<cr>
 " => EditorConfig (project-specific EditorConfig rule)
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 let g:EditorConfig_exclude_patterns = ['fugitive://.*']
-
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" => Fugitive
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Copy the link to the line of a Git repository to the clipboard
-nnoremap <leader>v :.GBrowse!<CR>
-xnoremap <leader>v :'<'>GBrowse!<CR>
